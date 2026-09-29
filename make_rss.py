@@ -80,6 +80,27 @@ technology_keywords = [
 
 all_target_keywords = mobility_keywords + technology_keywords
 
+
+# 🔧 수정: 키워드 매칭 함수
+#   - 영어 키워드는 소문자로 통일해서 비교 (기존엔 대소문자 불일치로 영어 키워드가 전부 매칭 실패)
+#   - 영어는 단어 경계(\b) 매칭 → 'OS'가 most/cost/post에, 'AV'가 have/save에 걸리는 오탐 방지
+#   - 한글은 부분 문자열 매칭 그대로 (한글은 단어 경계가 애매해서)
+def build_matcher(keywords):
+    korean = [k.lower() for k in keywords if re.search(r'[가-힣]', k)]
+    english = [re.escape(k.lower()) for k in keywords if not re.search(r'[가-힣]', k)]
+    pattern = re.compile(r'\b(?:' + '|'.join(english) + r')\b') if english else None
+
+    def match(text):
+        text = text.lower()
+        if pattern and pattern.search(text):
+            return True
+        return any(k in text for k in korean)
+    return match
+
+
+is_target_content = build_matcher(all_target_keywords)
+
+
 # 🚨 에러 원천 차단: 정규식을 버리고 가장 안전한 텍스트 파싱 방식으로 변경
 def clean_text(raw_text):
     if not raw_text: return ""
@@ -122,12 +143,12 @@ for url in urls:
                     if published_dt > retention_days:
                         raw_title = entry.get("title", "")
                         raw_summary = entry.get("summary", "") or entry.get("description", "")
-                        content_text = (raw_title + " " + raw_summary).lower()
+                        content_text = raw_title + " " + raw_summary
                         
                         filter_required_domains = ["autonews.com", "techcrunch.com", "smartcitiesdive.com", "theverge.com", "harvardbusinessreview", "technologyreview.com", "news.naver.com", "surfit", "news.google.com"]
                         
                         if any(domain in url for domain in filter_required_domains):
-                            is_mobility_news = any(keyword in content_text for keyword in all_target_keywords)
+                            is_mobility_news = is_target_content(content_text)   # 🔧 수정
                         else:
                             is_mobility_news = True
                         
