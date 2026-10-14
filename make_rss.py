@@ -46,58 +46,40 @@ urls = [
 ]
 
 mobility_keywords = [
-    # Vehicle & HW
     'EV', 'Electric Vehicle', 'Automotive', 'Battery', 'NACS', 'CCS',
     '전기차', '배터리', '충전 표준',
-    
-    # AV & Connected (SDV 핵심 영역)
     'AV', 'Autonomous Driving', 'Robotaxi', 'Autonomous Vehicle', 
     'Telematics', 'OTA', 'Over-the-Air', 'Connected Car',
     '자율주행', '로보택시', '커넥티드카', '텔레매틱스', '무선 업데이트',
-    
-    # MaaS & Players
     'Mobility', 'MaaS', 'Fleet', 'Kakao Mobility', 'Socar', 'Tmap',
     '모빌리티', '카카오모빌리티', '쏘카', '티맵', '차량공유'
 ]
 
 technology_keywords = [
-    # Platform & App Architecture
     'Superapp', 'Platform', 'OS', 'In-vehicle Infotainment', 'IVI',
     '슈퍼앱', '플랫폼', '인포테인먼트',
-    
-    # BM & Commerce
     'FoD', 'Feature on Demand', 'Fintech', 'Payment', 'Subscription', 'Membership',
     '핀테크', '결제', '구독', '멤버십',
-    
-    # AI & Personalization
     'AI Agent', 'Artificial Intelligence', 'LLM', 'Large Language Model', 'Personalization', 'Recommendation Engine',
     '인공지능', 'AI 에이전트', '개인화', '추천 엔진',
-    
-    # UX/UI
     'UX', 'User Experience', 'HMI', 'Human-Machine Interface',
     '사용자경험', '인터랙션 디자인'
 ]
 
 all_target_keywords = mobility_keywords + technology_keywords
 
-# 🚨 에러 원천 차단: 정규식을 버리고 가장 안전한 텍스트 파싱 방식으로 변경
 def clean_text(raw_text):
     if not raw_text: return ""
-    
-    # 1. HTML 태그 제거 및 특수문자 해독
     text = re.sub(r'<[^>]+>', '', raw_text)
     text = html.unescape(text).replace('\xa0', ' ').strip()
     
-    # 2. 다양한 대시 기호들과 파이프 기호를 표준 공백 분할용으로 정리
     for dash in ['—', '–', '-', '|']:
         if dash in text:
-            parts = text.rsplit(dash, 1)  # 맨 오른쪽 대시를 기준으로 분할
+            parts = text.rsplit(dash, 1)
             last_part = parts[1].lower().strip()
-            # 분할된 뒷부분이 '네이버'나 'naver' 관련 단어라면 앞부분만 취함
             if 'naver' in last_part or '네이버' in last_part:
                 text = parts[0].strip()
                 
-    # 3. 만약 정리 후 껍데기만 남았거나 네이버 텍스트 자체라면 제외하기 위해 빈값 리턴
     if text.lower().strip() in ['naver', '네이버', '']:
         return ""
         
@@ -107,11 +89,14 @@ raw_items = []
 now_utc = datetime.utcnow()
 retention_days = now_utc - timedelta(days=14)
 
-print(f"[{now_utc.strftime('%Y-%m-%d %H:%M:%S')}] RSS 피드 무손실 수집 시작...")
+print(f"[{now_utc.strftime('%Y-%m-%d %H:%M:%S',)}]: RSS 피드 수집 시작 (보존 기간 기준일: {retention_days.strftime('%Y-%m-%d')})")
 
 for url in urls:
     try:
         feed = feedparser.parse(url)
+        entry_count = len(feed.entries)
+        collected_count = 0
+        
         for entry in feed.entries:
             try: 
                 published_parsed = entry.get("published_parsed") or entry.get("updated_parsed")
@@ -146,7 +131,7 @@ for url in urls:
                                         final_link = decoded.get("decoded_url", final_link)
                                 except Exception:
                                     pass
-                            
+                        
                             item = Item(
                                 title=clean_title,
                                 link=final_link,
@@ -155,16 +140,22 @@ for url in urls:
                                 guid=Guid(final_link)
                             )
                             raw_items.append((published_dt, item))
-            except Exception:
+                            collected_count += 1
+            except Exception as inner_e:
                 continue
                 
+        print(f"🔍 [확인] {url[:50]}... -> 전체 {entry_count}개 중 조건 만족 {collected_count}개 수집")
+        
     except Exception as e:
         print(f"❌ 사이트 접근 실패 ({url}): {e}")
 
 raw_items.sort(key=lambda x: x[0], reverse=True)
 items = [target[1] for target in raw_items]
 
+print(f"📌 총 유효 수집 기사 수: {len(items)}개")
+
 if len(items) == 0:
+    print("⚠️ 경고: 수집된 기사가 없어 대체 안내 아이템을 추가합니다.")
     items.append(Item(
         title="[안내] 현재 수집된 최신 기사가 없습니다.",
         link="https://github.com",
