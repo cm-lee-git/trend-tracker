@@ -19,7 +19,7 @@ jobs:
                 
       - name: Install dependencies
         run: |
-          pip install feedparser rfeed googlenewsdecoder "selectolax<1.0.0"
+          pip install --no-cache-dir feedparser rfeed googlenewsdecoder "selectolax==0.3.27"
           
       - name: Run RSS Script
         run: |
