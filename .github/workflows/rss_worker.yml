@@ -1,9 +1,9 @@
 name: Update RSS Feed
 
 on:
+  workflow_dispatch: # 수동 실행 유지용 (선택)
   schedule:
-    - cron: '0 0 * * *' # 매일 자동 실행
-  workflow_dispatch: # 수동 실행 버튼 활성화
+    - cron: '0 * * * *' # 매시간 정각에 실행
 
 jobs:
   build:
